@@ -6,13 +6,13 @@ pipeline {
     }
 
     environment {
-        ACC_ID      = "843916760700"
-        REGION      = "us-east-1"
+        ACC_ID    = "843916760700"
+        REGION    = "us-east-1"
 
-        APP_REPO    = "petclinic"
-        MYSQL_REPO  = "petclinic-mysql"
+        APP_REPO  = "petclinic"
+        MYSQL_REPO = "petclinic-mysql"
 
-        IMAGE_TAG   = "${BUILD_NUMBER}"
+        IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
     options {
@@ -29,32 +29,26 @@ pipeline {
             }
         }
 
-        stage('Debug Workspace') {
-           steps {
-              sh '''
-                pwd
-                ls -la
-                find . -name pom.xml
-              '''
-            }
-        }
-
         stage('Build & Test') {
             steps {
-                sh '''
-                    mvn clean verify
-                '''
+                dir('petclinc') {
+                    sh '''
+                        mvn clean verify
+                    '''
+                }
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonar-server') {
-                    sh '''
-                        mvn sonar:sonar \
-                        -Dsonar.projectKey=petclinic \
-                        -Dsonar.projectName=petclinic
-                    '''
+                dir('petclinc') {
+                    withSonarQubeEnv('sonar-server') {
+                        sh '''
+                            mvn sonar:sonar \
+                            -Dsonar.projectKey=petclinic \
+                            -Dsonar.projectName=petclinic
+                        '''
+                    }
                 }
             }
         }
@@ -69,13 +63,15 @@ pipeline {
 
         stage('Verify Artifact') {
             steps {
-                sh '''
-                    ls -ltr target/
-                '''
+                dir('petclinc') {
+                    sh '''
+                        ls -ltr target/
+                    '''
+                }
             }
         }
 
-        stage('Trivy FS Scan') {
+        stage('Trivy File System Scan') {
             steps {
                 sh '''
                     trivy fs \
@@ -87,12 +83,10 @@ pipeline {
             }
         }
 
-        stage('Docker Compose Build') {
+        stage('Docker Build') {
             steps {
                 sh '''
                     docker compose build
-
-                    docker images | grep petclinc
                 '''
             }
         }
@@ -140,20 +134,26 @@ pipeline {
         stage('Push Images') {
             steps {
                 sh '''
-                    docker push \
-                    ${ACC_ID}.dkr.ecr.${REGION}.amazonaws.com/${APP_REPO}:${IMAGE_TAG}
+                    docker push ${ACC_ID}.dkr.ecr.${REGION}.amazonaws.com/${APP_REPO}:${IMAGE_TAG}
 
-                    docker push \
-                    ${ACC_ID}.dkr.ecr.${REGION}.amazonaws.com/${MYSQL_REPO}:${IMAGE_TAG}
+                    docker push ${ACC_ID}.dkr.ecr.${REGION}.amazonaws.com/${MYSQL_REPO}:${IMAGE_TAG}
+                '''
+            }
+        }
+
+        stage('Deploy Containers') {
+            steps {
+                sh '''
+                    docker compose down || true
+                    docker compose up -d
                 '''
             }
         }
     }
 
     post {
-
         success {
-            echo 'Build, SonarQube, Trivy and ECR Push Successful'
+            echo 'Build, SonarQube, Trivy, ECR Push and Deployment Successful'
         }
 
         failure {
