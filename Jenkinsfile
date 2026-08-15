@@ -37,26 +37,13 @@ pipeline {
                     '''
                 }
             }
-        }
-
-        stage('Debug') {
-           steps {
-            sh '''
-             pwd
-             tree -L 3
-            '''
-          }
-        }
+        }       
 
         stage('SonarQube Analysis') {
             steps {
                 dir('petclinc') {
-                    withSonarQubeEnv('sonar-server') {
-                        sh '''
-                            mvn sonar:sonar \
-                            -Dsonar.projectKey=petclinic \
-                            -Dsonar.projectName=petclinic
-                        '''
+                    withSonarQubeEnv('sonar-server') {                                                     
+                        sh "${tool 'sonar-8'}/bin/sonar-scanner"                         
                     }
                 }
             }
@@ -65,7 +52,12 @@ pipeline {
         stage('Quality Gate') {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
+                    script {
+                        def qg = waitForQualityGate() // Pauses pipeline
+                        if (qg.status != 'OK') {
+                            error "Pipeline aborted: ${qg.status}"
+                        }
+                    }
                 }
             }
         }
@@ -177,9 +169,12 @@ pipeline {
 
         always {
             sh '''
-                docker image prune -f || true                
+                docker image prune -f || true 
+                echo "=== Trivy Reports ==="
+                find . -name "trivy*"
+                ls -ltr
             '''
-            archiveArtifacts artifacts: '*.html', fingerprint: true
+        archiveArtifacts artifacts: '**/trivy-*.txt', allowEmptyArchive: true
             cleanWs()
         }
     }
