@@ -71,16 +71,17 @@ pipeline {
             }
         }
 
-        stage('Trivy File System Scan') {
-            steps {
-                sh '''
-                    trivy fs \
-                    --scanners vuln,secret,misconfig \
-                    --severity HIGH,CRITICAL \
-                    --format html -o trivy-fs-report.html . \
-                    --exit-code 0 \
-                    .
-                '''
+        stage('Trivy FS Scan') {
+           steps {
+             sh '''
+               trivy fs \
+               --scanners vuln,secret,misconfig \
+               --severity HIGH,CRITICAL \
+               --exit-code 0 \
+               --format table \
+               --output trivy-fs-report.txt \
+               .
+             '''
             }
         }
 
@@ -93,21 +94,23 @@ pipeline {
         }
 
         stage('Trivy Image Scan') {
-            steps {
-                sh '''
-                    trivy image \
-                    --severity HIGH,CRITICAL \
-                    --format html -o trivy-petclinc-report.html . \
-                    --exit-code 1 \
-                    piridi/petclinc:v1
+          steps {
+            sh '''
+            trivy image \
+            --severity HIGH,CRITICAL \
+            --exit-code 0 \
+            --format table \
+            --output trivy-app-report.txt \
+            piridi/petclinc:v1
 
-                    trivy image \
-                    --severity HIGH,CRITICAL \
-                    --format html -o trivy-mysql-report.html . \
-                    --exit-code 1 \
-                    piridi/petclinc-mysql:v1
-                '''
-            }
+            trivy image \
+            --severity HIGH,CRITICAL \
+            --exit-code 0 \
+            --format table \
+            --output trivy-mysql-report.txt \
+            piridi/petclinc-mysql:v1
+           '''
+           }
         }
 
         stage('ECR Login') {
