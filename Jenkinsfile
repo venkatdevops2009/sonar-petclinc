@@ -1,6 +1,3 @@
-# Jenkinsfile
-
-```groovy
 pipeline {
     agent {
         node {
@@ -126,4 +123,3 @@ pipeline {
         }
     }
 }
-```
