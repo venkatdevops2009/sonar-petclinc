@@ -6,24 +6,30 @@ pipeline {
     }
 
     environment {
-        ACC_ID    = "843916760700"
-        REGION    = "us-east-1"
-        PROJECT   = "petclinic"
+        ACC_ID      = "843916760700"
+        REGION      = "us-east-1"
 
-        VERSION   = "1.0.0"
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        APP_REPO    = "petclinic"
+        MYSQL_REPO  = "petclinic-mysql"
 
-        ECR_REPO  = "${ACC_ID}.dkr.ecr.${REGION}.amazonaws.com/${PROJECT}"
+        IMAGE_TAG   = "${BUILD_NUMBER}"
     }
 
     options {
         disableConcurrentBuilds()
-        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+        timeout(time: 45, unit: 'MINUTES')
     }
 
     stages {
 
-        stage('Build & Unit Tests') {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build & Test') {
             steps {
                 sh '''
                     mvn clean verify
@@ -59,7 +65,7 @@ pipeline {
             }
         }
 
-        stage('Trivy FileSystem Scan') {
+        stage('Trivy FS Scan') {
             steps {
                 sh '''
                     trivy fs \
@@ -71,13 +77,12 @@ pipeline {
             }
         }
 
-        stage('Docker Build') {
+        stage('Docker Compose Build') {
             steps {
                 sh '''
-                    docker build -t ${PROJECT}:${IMAGE_TAG} .
+                    docker compose build
 
-                    docker tag ${PROJECT}:${IMAGE_TAG} \
-                    ${ECR_REPO}:${IMAGE_TAG}
+                    docker images | grep petclinc
                 '''
             }
         }
@@ -88,28 +93,55 @@ pipeline {
                     trivy image \
                     --severity HIGH,CRITICAL \
                     --exit-code 1 \
-                    ${ECR_REPO}:${IMAGE_TAG}
+                    piridi/petclinc:v1
+
+                    trivy image \
+                    --severity HIGH,CRITICAL \
+                    --exit-code 1 \
+                    piridi/petclinc-mysql:v1
                 '''
             }
         }
 
-        stage('Push To ECR') {
+        stage('ECR Login') {
             steps {
                 withAWS(credentials: 'aws-creds', region: "${REGION}") {
-
                     sh '''
                         aws ecr get-login-password --region ${REGION} | \
                         docker login --username AWS --password-stdin \
                         ${ACC_ID}.dkr.ecr.${REGION}.amazonaws.com
-
-                        docker push ${ECR_REPO}:${IMAGE_TAG}
                     '''
                 }
+            }
+        }
+
+        stage('Tag Images') {
+            steps {
+                sh '''
+                    docker tag piridi/petclinc:v1 \
+                    ${ACC_ID}.dkr.ecr.${REGION}.amazonaws.com/${APP_REPO}:${IMAGE_TAG}
+
+                    docker tag piridi/petclinc-mysql:v1 \
+                    ${ACC_ID}.dkr.ecr.${REGION}.amazonaws.com/${MYSQL_REPO}:${IMAGE_TAG}
+                '''
+            }
+        }
+
+        stage('Push Images') {
+            steps {
+                sh '''
+                    docker push \
+                    ${ACC_ID}.dkr.ecr.${REGION}.amazonaws.com/${APP_REPO}:${IMAGE_TAG}
+
+                    docker push \
+                    ${ACC_ID}.dkr.ecr.${REGION}.amazonaws.com/${MYSQL_REPO}:${IMAGE_TAG}
+                '''
             }
         }
     }
 
     post {
+
         success {
             echo 'Build, SonarQube, Trivy and ECR Push Successful'
         }
@@ -119,6 +151,9 @@ pipeline {
         }
 
         always {
+            sh '''
+                docker image prune -f || true
+            '''
             cleanWs()
         }
     }
