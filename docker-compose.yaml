@@ -1,0 +1,49 @@
+name : petclinc
+
+services:
+
+  mysql:
+    build: ./mysql
+
+    image: piridi/petclinc-mysql:v1
+    
+    container_name: petclinic-mysql
+
+    restart: always
+
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: petclinic
+      MYSQL_USER: petclinic
+      MYSQL_PASSWORD: petclinic
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+    healthcheck:
+      test: ["CMD","mysqladmin","ping","-h","localhost"]
+      interval: 10s
+      retries: 10
+
+
+  petclinic:
+
+    build: ./petclinc
+
+    image: piridi/petclinc:v1
+
+    container_name: petclinic-app
+
+    restart: always
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    ports:
+      - "80:8080"
+volumes:
+  mysql-data:

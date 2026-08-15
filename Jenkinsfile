@@ -77,6 +77,7 @@ pipeline {
                     trivy fs \
                     --scanners vuln,secret,misconfig \
                     --severity HIGH,CRITICAL \
+                    --format html -o trivy-fs-report.html . \
                     --exit-code 0 \
                     .
                 '''
@@ -96,11 +97,13 @@ pipeline {
                 sh '''
                     trivy image \
                     --severity HIGH,CRITICAL \
+                    --format html -o trivy-petclinc-report.html . \
                     --exit-code 1 \
                     piridi/petclinc:v1
 
                     trivy image \
                     --severity HIGH,CRITICAL \
+                    --format html -o trivy-mysql-report.html . \
                     --exit-code 1 \
                     piridi/petclinc-mysql:v1
                 '''
@@ -162,8 +165,9 @@ pipeline {
 
         always {
             sh '''
-                docker image prune -f || true
+                docker image prune -f || true                
             '''
+            archiveArtifacts artifacts: '*.html', fingerprint: true
             cleanWs()
         }
     }
