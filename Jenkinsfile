@@ -29,6 +29,16 @@ pipeline {
             }
         }
 
+        stage('Debug Workspace') {
+           steps {
+              sh '''
+                pwd
+                ls -la
+                find . -name pom.xml
+              '''
+            }
+        }
+
         stage('Build & Test') {
             steps {
                 sh '''
