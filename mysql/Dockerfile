@@ -1,2 +1,2 @@
 FROM mysql:8
-COPY db/ /docker-entrypoint-initdb.d/
+COPY DB/ /docker-entrypoint-initdb.d/
