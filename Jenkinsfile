@@ -39,6 +39,15 @@ pipeline {
             }
         }
 
+        stage('Debug') {
+           steps {
+            sh '''
+             pwd
+             tree -L 3
+            '''
+          }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 dir('petclinc') {
