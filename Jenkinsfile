@@ -43,7 +43,11 @@ pipeline {
             steps {
                 dir('petclinc') {
                     withSonarQubeEnv('sonar-server') {                                                     
-                        sh "${tool 'sonar-8'}/bin/sonar-scanner"                         
+                        sh '''
+                        mvn clean verify sonar:sonar \
+                       -Dsonar.projectKey=petclinic \
+                       -Dsonar.projectName=petclinic
+                      '''                         
                     }
                 }
             }
